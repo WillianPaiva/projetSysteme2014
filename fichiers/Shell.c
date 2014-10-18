@@ -1,5 +1,9 @@
 /* Construction des arbres représentant des commandes */
-
+#include <unistd.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/wait.h>
 #include "Shell.h"
 
 /*
@@ -151,15 +155,18 @@ main (int argc, char **argv)
 
       Expression *e = ExpressionAnalysee;
 
-      fprintf (stderr,"Expression syntaxiquement correcte : ");
-      fprintf (stderr,"[%s]\n", previous_command_line());
+      fprintf(stderr,"Expression syntaxiquement correcte : ");
+      fprintf(stderr,"[%s]\n", previous_command_line());
 
         if (e->type == SIMPLE)
         {
-            printf("il s'agit d'une commande simple dont voici les arguments :\n");
-            for(int i=0; e->arguments[i] != NULL;i++)
-                printf("[%s]",e->arguments[i]);
-            putchar('\n');
+	//	printf("il s'agit d'une commande simple dont voici les arguments :\n");
+	//	  for(int i=0; e->arguments[i] != NULL;i++)
+	//		  printf("[%s]",e->arguments[i]);
+			if(fork()==0){
+				execvp(e->arguments[0], &e->arguments[0]);			
+			}
+			putchar('\n');
         }
         expression_free(e);
     }
