@@ -116,41 +116,41 @@ main (int argc, char **argv)
     if (yyparse () == 0) {
       /*--------------------------------------------------------------------------------------.
       | L'analyse de la ligne de commande est effectuée sans erreur.  La variable globale     |
-      |       ExpressionAnalysee pointe sur un arbre représentant l'expression.  Le type      |
-      |       "Expression" de l'arbre est décrit dans le fichier Shell.h. Il contient 4       |
-      |       champs. Si e est du type Expression :					      |
-      | 										      |
+      | ExpressionAnalysee pointe sur un arbre représentant l'expression.  Le type            |
+      | "Expression" de l'arbre est décrit dans le fichier Shell.h. Il contient 4             |
+      | champs. Si e est du type Expression :                                                 |
+      |                                                                                       |
       | - e.type est un type d'expression, contenant une valeur définie par énumération dans  |
-      |   Shell.h. Cette valeur peut être :					      	      |
-      | 										      |
-      |   - VIDE, commande vide								      |
-      |   - SIMPLE, commande simple et ses arguments					      |
-      |   - SEQUENCE, séquence (;) d'instructions					      |
-      |   - SEQUENCE_ET, séquence conditionnelle (&&) d'instructions			      |
-      |   - SEQUENCE_OU, séquence conditionnelle (||) d'instructions			      |
-      |   - BG, tâche en arrière plan (&)						      |
-      |   - PIPE, pipe (|).								      |
-      |   - REDIRECTION_I, redirection de l'entrée (<)					      |
-      |   - REDIRECTION_O, redirection de la sortie (>)					      |
-      |   - REDIRECTION_A, redirection de la sortie en mode APPEND (>>).		      |
-      |   - REDIRECTION_E, redirection de la sortie erreur,  	   			      |
-      |   - REDIRECTION_EO, redirection des sorties erreur et standard.			      |
-      | 										      |
+      | Shell.h. Cette valeur peut être :                                                     |
+      |                                                                                       |
+      | - VIDE, commande vide                                                                 |
+      | - SIMPLE, commande simple et ses arguments                                            |
+      | - SEQUENCE, séquence (;) d'instructions                                               |
+      | - SEQUENCE_ET, séquence conditionnelle (&&) d'instructions                            |
+      | - SEQUENCE_OU, séquence conditionnelle (|) d'instructions							  |
+      | - BG, tâche en arrière plan (&)                                                       |
+      | - PIPE, pipe (|).																	  |
+      | - REDIRECTION_I, redirection de l'entrée (<)                                          |
+      | - REDIRECTION_O, redirection de la sortie (>)                                         |
+      | - REDIRECTION_A, redirection de la sortie en mode APPEND (>>).                        |
+      | - REDIRECTION_E, redirection de la sortie erreur,                                     |
+      | - REDIRECTION_EO, redirection des sorties erreur et standard.                         |
+      |                                                                                       |
       | - e.gauche et e.droite, de type Expression *, représentent une sous-expression gauche |
-      |       et une sous-expression droite. Ces deux champs ne sont pas utilisés pour les    |
-      |       types VIDE et SIMPLE. Pour les expressions réclamant deux sous-expressions      |
-      |       (SEQUENCE, SEQUENCE_ET, SEQUENCE_OU, et PIPE) ces deux champs sont utilisés     |
-      |       simultannément.  Pour les autres champs, seule l'expression gauche est	      |
-      |       utilisée.									      |
-      | 										      |
-      | - e.arguments, de type char **, a deux interpretations :			      |
-      | 										      |
-      |      - si le type de la commande est simple, e.arguments pointe sur un tableau à la   |
-      |       argv. (e.arguments)[0] est le nom de la commande, (e.arguments)[1] est le	      |
-      |       premier argument, etc.							      |
-      | 										      |
-      |      - si le type de la commande est une redirection, (e.arguments)[0] est le nom du  |
-      |       fichier vers lequel on redirige.						      |
+      | et une sous-expression droite. Ces deux champs ne sont pas utilisés pour les          |
+      | types VIDE et SIMPLE. Pour les expressions réclamant deux sous-expressions            |
+      | (SEQUENCE, SEQUENCE_ET, SEQUENCE_OU, et PIPE) ces deux champs sont utilisés           |
+      | simultannément.  Pour les autres champs, seule l'expression gauche est                |
+      | utilisée.                                                                             |
+      |                                                                                       |
+      | - e.arguments, de type char **, a deux interpretations :                              |
+      |                                                                                       |
+      | - si le type de la commande est simple, e.arguments pointe sur un tableau à la        |
+      | argv. (e.arguments)[0] est le nom de la commande, (e.arguments)[1] est le             |
+      | premier argument, etc.                                                                |
+      |                                                                                       |
+      | - si le type de la commande est une redirection, (e.arguments)[0] est le nom du       |
+      | fichier vers lequel on redirige.                                                      |
       `--------------------------------------------------------------------------------------*/
 
       Expression *e = ExpressionAnalysee;
