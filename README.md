@@ -88,9 +88,9 @@ aux enseignants le dimanche 23 novembre minuit.
 session vous sera assigné. Mettre dans une archive tar à la fois le rapport et le code. Le nom de
 l’archive aura le format suivant :
 
-
+```bash
 tar czf x-login1-login2-login3-CLEF-SECRETE.tar.gz rapport.pdf code/
-
+```
 
 où x est le numéro de votre session de soutenance, login(1,2,3) sont les logins des membres du
 trinôme, CLEF-SECRETE une suite de caractères de votre choix. Utiliser ensuite la commande
