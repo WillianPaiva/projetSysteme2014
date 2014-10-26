@@ -101,7 +101,7 @@ expression_free(Expression *e)
   if (e->arguments != NULL)
     {
       for (int i = 0; e->arguments[i] != NULL; i++)
-	free(e->arguments[i]);
+		free(e->arguments[i]);
       free(e->arguments);  
     }
 
@@ -160,14 +160,28 @@ main (int argc, char **argv)
 
         if (e->type == SIMPLE)
         {
-	//	printf("il s'agit d'une commande simple dont voici les arguments :\n");
-	//	  for(int i=0; e->arguments[i] != NULL;i++)
-	//		  printf("[%s]",e->arguments[i]);
-			if(fork()==0){
-				execvp(e->arguments[0], &e->arguments[0]);			
+			if (fork() == 0){
+				execvp(e->arguments[0], &e->arguments[0]);
+				perror(e->arguments[0]);
+				exit(1);
 			}
 			putchar('\n');
         }
+        
+        else if (e->type == REDIRECTION_I){
+			int fd = open(e->arguments[0],O_RDONLY, 0440);
+			if (fork() == 0){
+				dup2(fd,0);
+				close(0);
+				execvp(e->gauche->arguments[0], &e->gauche->arguments[0]);
+				perror(e->gauche->arguments[0]);
+				exit(1);
+			}
+			close(fd);
+		}
+		else if (e->type == REDIRECTION_O){
+			int fd = open(e->arguments[0],O_WRONLY | O_CREAT | O_TRUNC, 0660);
+		}
         expression_free(e);
     }
     else {
