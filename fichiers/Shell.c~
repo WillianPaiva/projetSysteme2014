@@ -152,31 +152,8 @@ main (int argc, char **argv)
       | - si le type de la commande est une redirection, (e.arguments)[0] est le nom du       |
       | fichier vers lequel on redirige.                                                      |
       `--------------------------------------------------------------------------------------*/
- 	/* PIPE */
-      int cpipe [2];
-      pipe(cpipe);	
-      int pid = fork();
-      if (pid > 0) 
-	{
-	  
-	  dup2(cpipe[0],0);
-	  execlp (argv[2],argv[2],NULL);
-	  perror (argv [1]);
-	  exit (1);
-	}
-      if (pid == 0){
-	int ccpipe [2];
-	pipe (ccpipe);	
-	dup2 (ccpipe[1],1);
-	execvp (argv[0],&argv[0]);
-	perror (argv [2]);
-	exit (1);
-      }
-  return 0;
- }
 
       Expression *e = ExpressionAnalysee;
-
 
       fprintf(stderr,"Expression syntaxiquement correcte : ");
       fprintf(stderr,"[%s]\n", previous_command_line());
