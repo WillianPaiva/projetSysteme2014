@@ -6,6 +6,8 @@
 #include <sys/wait.h>
 #include "Shell.h"
 
+int execute(Expression *e);
+
 /*
  * Construit une expression à partir de sous-expressions
  */
@@ -152,33 +154,15 @@ main (int argc, char **argv)
       | - si le type de la commande est une redirection, (e.arguments)[0] est le nom du       |
       | fichier vers lequel on redirige.                                                      |
       `--------------------------------------------------------------------------------------*/
- 	/* PIPE */
-      int cpipe [2];
-      pipe(cpipe);	
-      int pid = fork();
-      if (pid > 0) 
-	{
-	  
-	  dup2(cpipe[0],0);
-	  execlp (argv[2],argv[2],NULL);
-	  perror (argv [1]);
-	  exit (1);
-	}
-      if (pid == 0){
-	int ccpipe [2];
-	pipe (ccpipe);	
-	dup2 (ccpipe[1],1);
-	execvp (argv[0],&argv[0]);
-	perror (argv [2]);
-	exit (1);
-      }
-  return 0;
- }
+
+		
+		
+	
 
       Expression *e = ExpressionAnalysee;
 
-
-      fprintf(stderr,"Expression syntaxiquement correcte : ");
+	  int result = execute(e);
+      /*fprintf(stderr,"Expression syntaxiquement correcte : ");
       fprintf(stderr,"[%s]\n", previous_command_line());
 
         if (e->type == SIMPLE)
@@ -205,7 +189,7 @@ main (int argc, char **argv)
 		else if (e->type == REDIRECTION_O){
 			int fd = open(e->arguments[0],O_WRONLY | O_CREAT | O_TRUNC, 0660);
 		}
-        expression_free(e);
+        expression_free(e);*/
     }
     else {
       /* L'analyse de la ligne de commande a donné une erreur */
@@ -214,4 +198,62 @@ main (int argc, char **argv)
     }
   }
   return 0;
+}
+
+
+
+
+
+int execute(Expression *e)
+{
+	if(e->type == SIMPLE)
+	{
+		pid_t childPID = fork();
+		if(childPID >= 0) //fork was successful
+		{
+			if(childPID == 0) //child process
+			{
+				execvp(e->arguments[0], &e->arguments[0]);
+				perror(e->arguments[0]);
+				exit(1);
+			}
+			else//parent process
+			{
+				putchar('\n');
+				return 1;
+			}
+		}
+		else// fork failed 
+		{
+			return 0;
+		}
+	}
+	if(e->type == SEQUENCE){
+		execute(e->gauche);
+		execute(e->droite);
+		return 1;
+	}
+	if(e->type == SEQUENCE_ET)
+	{
+		if(execute(e->gauche) && execute(e->droite))
+		{
+			return 1;
+		}
+		else
+		{
+			return 0;
+		}
+	}
+	if(e->type == SEQUENCE_OU)
+	{
+		if(execute(e->gauche) || execute(e->droite))
+		{
+			return 1;
+		}
+		else
+		{
+			return 0;
+		}
+	}
+
 }
