@@ -145,7 +145,7 @@ main (int argc, char **argv)
 	}else{
 		user = '$';
 	}	
-	printf(ANSI_COLOR_GREEN "%s  %c>"ANSI_COLOR_RESET " ",cwd,user);
+	printf(ANSI_COLOR_GREEN "%s " ANSI_COLOR_BLUE " %c" ANSI_COLOR_RED ">>>"ANSI_COLOR_RESET " ",cwd,user);
 
 
 	while (1){
@@ -197,7 +197,7 @@ main (int argc, char **argv)
 			lastfd = 0;
 			execute(e,1,0,1,2,1);
 			printf("\n");
-			printf(ANSI_COLOR_GREEN "%s  %c>"ANSI_COLOR_RESET " ",cwd,user);
+				printf(ANSI_COLOR_GREEN "%s " ANSI_COLOR_BLUE " %c" ANSI_COLOR_RED ">>>"ANSI_COLOR_RESET " ",cwd,user);
 
 
 			
