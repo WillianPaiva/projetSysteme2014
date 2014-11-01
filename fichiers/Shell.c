@@ -19,6 +19,8 @@
 int execute(Expression *e , int wait, int fdin,int fdout,int fderror, int lastflag);
 void ch_lastfd(int max);
 int lastfd;
+char cwd[1024];
+
 /*
  * Construit une expression à partir de sous-expressions
  */
@@ -129,6 +131,8 @@ expression_free(Expression *e)
 	int
 main (int argc, char **argv) 
 {
+	getcwd(cwd, sizeof(cwd));
+	printf("%s >>> ",cwd);
 
 
 	while (1){
@@ -178,8 +182,11 @@ main (int argc, char **argv)
 
 			Expression *e = ExpressionAnalysee;
 			lastfd = 0;
-			printf("%s\n","test execute next line" );
 			execute(e,1,0,1,2,1);
+			printf("\n");
+			printf("%s >>> ",cwd);
+
+			
 			/*fprintf(stderr,"Expression syntaxiquement correcte : ");
 			  fprintf(stderr,"[%s]\n", previous_command_line());
 
@@ -224,54 +231,60 @@ int execute(Expression *e , int wait, int fdin,int fdout,int fderror, int lastfl
 	pid_t childPID;
 	int fd;
 	int pp[2];
-	
+
 
 	switch (e->type) {
 		case SIMPLE:
-			childPID = fork();
-			if(childPID >= 0) //fork was successful
-			{
-				if(childPID == 0) //child process
-				{
-					if(fdin != 0){
-						dup2(fdin,0);
-						close(fdin);
-					}
-					if(fdout != 1){
-						dup2(fdout,1);
-						close(fdout);
-					}
-					if(fderror != 2){
-						dup2(fderror,2);
-						close(fderror);
-					}
-					for(int i = 3; i <= lastfd; i++){
-						close(i);
-					}
+			if(strcmp(e->arguments[0],"cd") ==0){
+				chdir(e->arguments[1]);
+				getcwd(cwd, sizeof(cwd));
+				break;
+			}else{
 
-					status = execvp(e->arguments[0], &e->arguments[0]);
-					perror(e->arguments[0]);
-					exit(1);
-				}
-				else//parent process
+				childPID = fork();
+				if(childPID >= 0) //fork was successful
 				{
-
-					if(wait == 1){
+					if(childPID == 0) //child process
+					{
+						if(fdin != 0){
+							dup2(fdin,0);
+							close(fdin);
+						}
+						if(fdout != 1){
+							dup2(fdout,1);
+							close(fdout);
+						}
+						if(fderror != 2){
+							dup2(fderror,2);
+							close(fderror);
+						}
 						for(int i = 3; i <= lastfd; i++){
 							close(i);
 						}
-						printf("%s\n","going to wait" );
-						waitpid(childPID, &status, WNOHANG);
+
+						status = execvp(e->arguments[0], &e->arguments[0]);
+						perror(e->arguments[0]);
+						exit(1);
 					}
-					putchar('\n');
-					break;
+					else//parent process
+					{
+
+						if(wait == 1){
+							for(int i = 3; i <= lastfd; i++){
+								close(i);
+							}
+							waitpid(childPID, &status, 0);
+						}
+						putchar('\n');
+						break;
+					}
 				}
+				else// fork failed 
+				{
+					perror("fork");
+				}
+				break;
 			}
-			else// fork failed 
-			{
-				perror("fork");
-			}
-			break;
 		case SEQUENCE:
 			execute(e->gauche,1,fdin,fdout,fderror,0);
 			execute(e->droite,1,fdin,fdout,fderror,0);
