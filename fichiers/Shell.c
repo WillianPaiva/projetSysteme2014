@@ -1,17 +1,24 @@
 /* Construction des arbres représentant des commandes */
+#include <argz.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include <string.h>
 #include <unistd.h>
 #include <stdlib.h>
-#include <stdio.h>
 #include <fcntl.h>
+#include <sys/wait.h>
+#include <signal.h>
+#include <sys/types.h>
 #include <sys/wait.h>
 #include "Shell.h"
 
 
-#define MAX_PIPE 30
 
 
-int execute(Expression *e , int wait, int fdin,int fdout,int fderror);
-
+int execute(Expression *e , int wait, int fdin,int fdout,int fderror, int lastflag);
+void ch_lastfd(int max);
+int lastfd;
 /*
  * Construit une expression à partir de sous-expressions
  */
@@ -117,6 +124,8 @@ expression_free(Expression *e)
 }
 
 
+
+
 	int
 main (int argc, char **argv) 
 {
@@ -168,9 +177,9 @@ main (int argc, char **argv)
 
 
 			Expression *e = ExpressionAnalysee;
-
+			lastfd = 0;
 			printf("%s\n","test execute next line" );
-			execute(e,1,0,1,2);
+			execute(e,1,0,1,2,1);
 			/*fprintf(stderr,"Expression syntaxiquement correcte : ");
 			  fprintf(stderr,"[%s]\n", previous_command_line());
 
@@ -210,11 +219,12 @@ main (int argc, char **argv)
 }
 
 
-int execute(Expression *e , int wait, int fdin,int fdout,int fderror){
+int execute(Expression *e , int wait, int fdin,int fdout,int fderror, int lastflag){
 	int status;
 	pid_t childPID;
 	int fd;
 	int pp[2];
+	
 
 	switch (e->type) {
 		case SIMPLE:
@@ -226,37 +236,30 @@ int execute(Expression *e , int wait, int fdin,int fdout,int fderror){
 					if(fdin != 0){
 						dup2(fdin,0);
 						close(fdin);
-						if(fdin > 2){
-							close(fdin +1);	
-						}
 					}
-					if(fdout != 0){
+					if(fdout != 1){
 						dup2(fdout,1);
 						close(fdout);
-						if(fdout > 3){
-							close(fdout -1);
-						}
 					}
 					if(fderror != 2){
 						dup2(fderror,2);
 						close(fderror);
 					}
+					for(int i = 3; i <= lastfd; i++){
+						close(i);
+					}
+
 					status = execvp(e->arguments[0], &e->arguments[0]);
 					perror(e->arguments[0]);
 					exit(1);
 				}
 				else//parent process
 				{
-					if(fdin > 2){
-						close(fdin);	
-						close(fdin +1);	
-					}
-					if(fdout > 3){
-						close(fdout);
-						close(fdout -1);
-					}
 
 					if(wait == 1){
+						for(int i = 3; i <= lastfd; i++){
+							close(i);
+						}
 						printf("%s\n","going to wait" );
 						waitpid(childPID, &status, WNOHANG);
 					}
@@ -270,50 +273,59 @@ int execute(Expression *e , int wait, int fdin,int fdout,int fderror){
 			}
 			break;
 		case SEQUENCE:
-			execute(e->gauche,1,fdin,fdout,fderror);
-			execute(e->droite,1,fdin,fdout,fderror);
+			execute(e->gauche,1,fdin,fdout,fderror,0);
+			execute(e->droite,1,fdin,fdout,fderror,0);
 			break;
 		case SEQUENCE_ET:
-			execute(e->gauche,0,fdin,fdout,fderror);
-			execute(e->droite,1,fdin,fdout,fderror);
+			execute(e->gauche,0,fdin,fdout,fderror,0);
+			execute(e->droite,1,fdin,fdout,fderror,0);
 			break;
 		case SEQUENCE_OU:
-			execute(e->gauche,0,fdin,fdout,fderror);
-			execute(e->droite,1,fdin,fdout,fderror);
+			execute(e->gauche,0,fdin,fdout,fderror,0);
+			execute(e->droite,1,fdin,fdout,fderror,0);
 			break;
 		case BG:
-			execute(e->gauche,0,fdin,fdout,fderror);
+			execute(e->gauche,0,fdin,fdout,fderror,0);
 			break;
 		case PIPE:
 			if(pipe(pp) < 0){
 				perror("pipe");
 				exit(1);
 			}
-			execute(e->gauche,0,fdin,pp[1],fderror);
-			execute(e->droite,1,pp[0],fdout,fderror);
+			ch_lastfd(pp[1]);
+			execute(e->gauche,0,fdin,pp[1],fderror,0);
+			if(lastflag == 1){
+				execute(e->droite,1,pp[0],fdout,fderror,0);
+			}else{
+				execute(e->droite,0,pp[0],fdout,fderror,0);
+			}
 			break;
 		case REDIRECTION_I:
 			fd = open(e->arguments[0],O_RDONLY, 0666);
-			execute(e->gauche,1,fd,fdout,fderror);
+			ch_lastfd(fd);
+			execute(e->gauche,1,fd,fdout,fderror,0);
 			break;
 		case REDIRECTION_O:
 			fd = open(e->arguments[0],O_CREAT | O_RDWR, 0666);
-			execute(e->gauche,1,fdin,fd,fderror);
+			ch_lastfd(fd);
+			execute(e->gauche,1,fdin,fd,fderror,0);
 			break;
 		case REDIRECTION_A:
 			fd = open(e->arguments[0], O_TRUNC | O_CREAT | O_RDWR, 0666);
-			execute(e->gauche,1,fdin,fd,fderror);
+			ch_lastfd(fd);
+			execute(e->gauche,1,fdin,fd,fderror,0);
 			break;
 		case REDIRECTION_E:
 			fd = open(e->arguments[0], O_CREAT | O_RDWR, 0666);
-			execute(e->gauche,1,fdin,fdout,fd);
+			ch_lastfd(fd);
+			execute(e->gauche,1,fdin,fdout,fd,0);
 			break;
 		case REDIRECTION_EO:
 			fd = open(e->arguments[0], O_CREAT | O_RDWR, 0666);
-			execute(e->gauche,1,fdin,fd,fd);
+			ch_lastfd(fd);
+			execute(e->gauche,1,fdin,fd,fd,0);
 			break;
 		default:
-			return 0;
 			break;
 
 	}
@@ -322,4 +334,12 @@ int execute(Expression *e , int wait, int fdin,int fdout,int fderror){
 
 }
 
+
+
+
+void ch_lastfd(int max){
+	if(lastfd < max){
+		lastfd = max;
+	}
+}
 
