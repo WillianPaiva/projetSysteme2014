@@ -225,11 +225,17 @@ int execute(Expression *e , int wait, int fdin,int fdout,int fderror){
 				{
 					if(fdin != 0){
 						dup2(fdin,0);
-						close(fdin);	
+						close(fdin);
+						if(fdin > 2){
+							close(fdin +1);	
+						}
 					}
-					if(fdout != 1){
+					if(fdout != 0){
 						dup2(fdout,1);
 						close(fdout);
+						if(fdout > 3){
+							close(fdout -1);
+						}
 					}
 					if(fderror != 2){
 						dup2(fderror,2);
@@ -241,8 +247,18 @@ int execute(Expression *e , int wait, int fdin,int fdout,int fderror){
 				}
 				else//parent process
 				{
+					if(fdin > 2){
+						close(fdin);	
+						close(fdin +1);	
+					}
+					if(fdout > 3){
+						close(fdout);
+						close(fdout -1);
+					}
+
 					if(wait == 1){
-						waitpid(childPID, &status, 0);
+						printf("%s\n","going to wait" );
+						waitpid(childPID, &status, WNOHANG);
 					}
 					putchar('\n');
 					break;
@@ -274,7 +290,7 @@ int execute(Expression *e , int wait, int fdin,int fdout,int fderror){
 				exit(1);
 			}
 			execute(e->gauche,0,fdin,pp[1],fderror);
-			execute(e->droite,0,pp[0],fdout,fderror);
+			execute(e->droite,1,pp[0],fdout,fderror);
 			break;
 		case REDIRECTION_I:
 			fd = open(e->arguments[0],O_RDONLY, 0666);
