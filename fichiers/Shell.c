@@ -20,6 +20,7 @@ int execute(Expression *e , int wait, int fdin,int fdout,int fderror, int lastfl
 void ch_lastfd(int max);
 int lastfd;
 char cwd[1024];
+char user;
 
 /*
  * Construit une expression à partir de sous-expressions
@@ -132,7 +133,12 @@ expression_free(Expression *e)
 main (int argc, char **argv) 
 {
 	getcwd(cwd, sizeof(cwd));
-	printf("%s >>> ",cwd);
+	if(getuid()==0){
+		user = '#';
+	}else{
+		user = '$';
+	}	
+	printf("%s  %c> ",cwd,user);
 
 
 	while (1){
@@ -184,7 +190,7 @@ main (int argc, char **argv)
 			lastfd = 0;
 			execute(e,1,0,1,2,1);
 			printf("\n");
-			printf("%s >>> ",cwd);
+			printf("%s  %c> ",cwd,user);
 
 			
 			/*fprintf(stderr,"Expression syntaxiquement correcte : ");
