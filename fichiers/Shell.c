@@ -6,11 +6,17 @@
 #include <sys/wait.h>
 #include "Shell.h"
 
-int execute(Expression *e , int wait, int tube);
+
+#define MAX_PIPE 30
+
+
+int execute(Expression *e , int wait, int fdin,int fdout,int fderror);
 
 /*
  * Construit une expression à partir de sous-expressions
  */
+
+
 Expression *ConstruireNoeud (expr_t type, Expression *g, Expression *d, char **args)
 {
 	Expression *e;
@@ -114,6 +120,8 @@ expression_free(Expression *e)
 	int
 main (int argc, char **argv) 
 {
+
+
 	while (1){
 		if (yyparse () == 0) {
 			/*--------------------------------------------------------------------------------------.
@@ -161,7 +169,8 @@ main (int argc, char **argv)
 
 			Expression *e = ExpressionAnalysee;
 
-			execute(e,1,0);
+			printf("%s\n","test execute next line" );
+			execute(e,1,0,1,2);
 			/*fprintf(stderr,"Expression syntaxiquement correcte : ");
 			  fprintf(stderr,"[%s]\n", previous_command_line());
 
@@ -201,30 +210,30 @@ main (int argc, char **argv)
 }
 
 
-int execute(Expression *e , int wait, int tube){
-	pid_t childPID = fork();
+int execute(Expression *e , int wait, int fdin,int fdout,int fderror){
 	int status;
+	pid_t childPID;
+	int fd;
 	int pp[2];
-
-	if(pipe(pp)==-1){
-		perror("pipe");
-		exit(1);
-	}
 
 	switch (e->type) {
 		case SIMPLE:
+			childPID = fork();
 			if(childPID >= 0) //fork was successful
 			{
 				if(childPID == 0) //child process
 				{
-					if(tube == 1){
-						dup2(pp[1],1);
-						close(pp[1]);
-						close(pp[0]);
-					}else if(tube == 2){
-						dup2(pp[0],0);
-						close(pp[0]);
-						close(pp[1]);
+					if(fdin != 0){
+						dup2(fdin,0);
+						close(fdin);	
+					}
+					if(fdout != 1){
+						dup2(fdout,1);
+						close(fdout);
+					}
+					if(fderror != 2){
+						dup2(fderror,2);
+						close(fderror);
 					}
 					status = execvp(e->arguments[0], &e->arguments[0]);
 					perror(e->arguments[0]);
@@ -233,10 +242,10 @@ int execute(Expression *e , int wait, int tube){
 				else//parent process
 				{
 					if(wait == 1){
-						printf("------------------------------ wainting ---------------------------");
 						waitpid(childPID, &status, 0);
 					}
 					putchar('\n');
+					break;
 				}
 			}
 			else// fork failed 
@@ -245,25 +254,50 @@ int execute(Expression *e , int wait, int tube){
 			}
 			break;
 		case SEQUENCE:
-			execute(e->gauche,1,0);
-			execute(e->droite,1,0);
+			execute(e->gauche,1,fdin,fdout,fderror);
+			execute(e->droite,1,fdin,fdout,fderror);
 			break;
 		case SEQUENCE_ET:
-			execute(e->gauche,0,0);
-			execute(e->droite,1,0);
+			execute(e->gauche,0,fdin,fdout,fderror);
+			execute(e->droite,1,fdin,fdout,fderror);
 			break;
 		case SEQUENCE_OU:
-			execute(e->gauche,0,0);
-			execute(e->droite,1,0);
+			execute(e->gauche,0,fdin,fdout,fderror);
+			execute(e->droite,1,fdin,fdout,fderror);
 			break;
 		case BG:
-			execute(e->gauche,0,0);
+			execute(e->gauche,0,fdin,fdout,fderror);
 			break;
 		case PIPE:
-			execute(e->gauche,0,1);
-			execute(e->droite,0,2);
+			if(pipe(pp) < 0){
+				perror("pipe");
+				exit(1);
+			}
+			execute(e->gauche,0,fdin,pp[1],fderror);
+			execute(e->droite,0,pp[0],fdout,fderror);
+			break;
+		case REDIRECTION_I:
+			fd = open(e->arguments[0],O_RDONLY, 0666);
+			execute(e->gauche,1,fd,fdout,fderror);
+			break;
+		case REDIRECTION_O:
+			fd = open(e->arguments[0],O_CREAT | O_RDWR, 0666);
+			execute(e->gauche,1,fdin,fd,fderror);
+			break;
+		case REDIRECTION_A:
+			fd = open(e->arguments[0], O_TRUNC | O_CREAT | O_RDWR, 0666);
+			execute(e->gauche,1,fdin,fd,fderror);
+			break;
+		case REDIRECTION_E:
+			fd = open(e->arguments[0], O_CREAT | O_RDWR, 0666);
+			execute(e->gauche,1,fdin,fdout,fd);
+			break;
+		case REDIRECTION_EO:
+			fd = open(e->arguments[0], O_CREAT | O_RDWR, 0666);
+			execute(e->gauche,1,fdin,fd,fd);
 			break;
 		default:
+			return 0;
 			break;
 
 	}
@@ -271,3 +305,5 @@ int execute(Expression *e , int wait, int tube){
 
 
 }
+
+
