@@ -31,6 +31,10 @@ typedef struct Expression {
   char   **arguments;
 } Expression;
 
+
+
+
+
 int yyparse(void);
 extern char *previous_command_line(void);
 extern void reset_command_line(void);
@@ -39,6 +43,21 @@ char **AjouterArg (char **, char *);
 char **InitialiserListeArguments (void);
 int LongueurListe(char **);
 void EndOfFile(void);
+int execute(Expression *e , int wait, int fdin,int fdout,int fderror, int lastflag);
+void ch_lastfd(int max);
+void addjob(int job);
+void printjobs();
+
+ 
+ 
+void append(int num); 
+void add( int num );
+void addafter(int num, int loc) ; 
+void insert(int num) ; 
+int delete(int num);  
+void  display(); 
+int count();
+
 
 void yyerror (char *s);
 Expression *ExpressionAnalysee;
