@@ -58,8 +58,16 @@ Expression *ConstruireNoeud (expr_t type, Expression *g, Expression *d, char **a
 	return e;
 } /* ConstruireNoeud */
 
+struct sigaction sa;
 
+void sigchild_handler(int sig){
+	pid_t pid;
+	int status;
+	while((pid = waitpid(-1, &status, WNOHANG)) > 0){
+		delete(pid);	
+	}
 
+}
 
 
 
@@ -152,7 +160,14 @@ expression_free(Expression *e)
 
 	int
 main (int argc, char **argv) 
-{
+{   
+
+
+	sigemptyset(&sa.sa_mask);
+	sa.sa_flags = 0;
+	sa.sa_handler = sigchild_handler;
+	sigaction(SIGCHLD, &sa, NULL);
+
 	head=NULL;
 
 
@@ -166,9 +181,6 @@ main (int argc, char **argv)
 
 
 
-
-
-	
 	while (1){
 		if (yyparse () == 0) {
 			/*--------------------------------------------------------------------------------------.
@@ -377,6 +389,9 @@ int execute(Expression *e , int wait, int fdin,int fdout,int fderror, int lastfl
 			fd = open(e->arguments[0], O_CREAT | O_RDWR, 0666);
 			ch_lastfd(fd);
 			execute(e->gauche,1,fdin,fd,fd,0);
+			break;
+		case VIDE:
+			putchar('\n');
 			break;
 		default:
 			break;
