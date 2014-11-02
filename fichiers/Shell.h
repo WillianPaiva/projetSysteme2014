@@ -93,24 +93,7 @@ void putJobForeground(t_job* job, int continueJob);
 void putJobBackground(t_job* job, int continueJob);
 
 t_job* delJob(t_job* job);
-
-
-
-
-
-
-
-
-
- 
- 
-//void append(int num); 
-//void add( int num );
-//void addafter(int num, int loc) ; 
-//void insert(int num) ; 
-//int delete(int num);  
-//void  display(); 
-//int count();
+int changeJobStatus(int pid, int status);
 
 
 void yyerror (char *s);
