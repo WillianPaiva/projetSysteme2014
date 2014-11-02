@@ -21,20 +21,35 @@
 #define ANSI_COLOR_CYAN    "\x1b[36m"
 #define ANSI_COLOR_RESET   "\x1b[0m"
 
+#define TRUE 1
+#define FALSE !TRUE
+
+#define FOREGROUND 'F'
+#define BACKGROUND 'B'
+#define SUSPENDED 'S'
+#define WAITING_INPUT 'W'
+
+
+#define BY_PROCESS_ID 1
+#define BY_JOB_ID 2
+#define BY_JOB_STATUS 3
+
 
 
 int lastfd;
 char cwd[1024];
 char user;
 
-struct node
-{
-	int data;
-	struct node *next;
-}*head;
 
 
-struct node *jobs;
+/*struct node*/
+/*{*/
+/*int data;*/
+/*struct node *next;*/
+/*}*head;*/
+
+
+/*struct node *jobs;*/
 
 
 /*
@@ -64,7 +79,6 @@ void sigchild_handler(int sig){
 	pid_t pid;
 	int status;
 	while((pid = waitpid(-1, &status, WNOHANG)) > 0){
-		delete(pid);	
 	}
 
 }
@@ -161,14 +175,19 @@ expression_free(Expression *e)
 	int
 main (int argc, char **argv) 
 {   
+	int TERMINAL = STDIN_FILENO;
+	int is_iteractive = isatty(TERMINAL);
+	if(is_iteractive){
+		signal(SIGQUIT, SIG_IGN);
+		signal(SIGTTOU, SIG_IGN);
+		signal(SIGTTIN, SIG_IGN);
+		signal(SIGTSTP, SIG_IGN);
+		signal(SIGINT, SIG_IGN);
+		signal(SIGCHLD, &sigchild_handler);
+	}
 
 
-	sigemptyset(&sa.sa_mask);
-	sa.sa_flags = 0;
-	sa.sa_handler = sigchild_handler;
-	sigaction(SIGCHLD, &sa, NULL);
 
-	head=NULL;
 
 
 	getcwd(cwd, sizeof(cwd));
@@ -228,7 +247,7 @@ main (int argc, char **argv)
 
 			Expression *e = ExpressionAnalysee;
 			lastfd = 0;
-			execute(e,1,0,1,2,1);
+			execute(e,1,0,1,2,1,0);
 			printf("\n");
 			printf(ANSI_COLOR_GREEN "%s " ANSI_COLOR_BLUE " %c" ANSI_COLOR_RED ">>>"ANSI_COLOR_RESET " ",cwd,user);
 
@@ -273,21 +292,18 @@ main (int argc, char **argv)
 }
 
 
-int execute(Expression *e , int wait, int fdin,int fdout,int fderror, int lastflag){
-	int status;
+int execute(Expression *e , int wait, int fdin,int fdout,int fderror, int lastflag, int futurewait){
 	pid_t childPID;
 	int fd;
 	int pp[2];
+	int mode;
+	t_job* job;
+
 
 
 	switch (e->type) {
 		case SIMPLE:
-			if(strcmp(e->arguments[0],"cd") ==0){
-				chdir(e->arguments[1]);
-				getcwd(cwd, sizeof(cwd));
-				break;
-			}else if (strcmp(e->arguments[0],"jobs") ==0){
-				display();
+			if(builtincommands(e) == 1){
 				break;
 			}else{
 
@@ -312,20 +328,29 @@ int execute(Expression *e , int wait, int fdin,int fdout,int fderror, int lastfl
 							close(i);
 						}
 
-						status = execvp(e->arguments[0], &e->arguments[0]);
+						execvp(e->arguments[0], &e->arguments[0]);
 						perror(e->arguments[0]);
 						exit(1);
 					}
 					else//parent process
 					{
+						if(wait == 1){
+							mode = FOREGROUND;
+						}else{
+							mode = BACKGROUND;
+						}
+
+						jobsList = insertJob(childPID,e->arguments[0],(int) mode,futurewait);
+						job = getJob(childPID, BY_PROCESS_ID);
 
 						if(wait == 1){
 							for(int i = 3; i <= lastfd; i++){
 								close(i);
 							}
-							waitpid(childPID, &status, 0);
+							putJobForeground(job, FALSE);
+
 						}else{
-							insert(childPID);
+							putJobBackground(job, FALSE);
 						}
 						putchar('\n');
 						break;
@@ -338,19 +363,19 @@ int execute(Expression *e , int wait, int fdin,int fdout,int fderror, int lastfl
 				break;
 			}
 		case SEQUENCE:
-			execute(e->gauche,1,fdin,fdout,fderror,0);
-			execute(e->droite,1,fdin,fdout,fderror,0);
+			execute(e->gauche,1,fdin,fdout,fderror,0,0);
+			execute(e->droite,1,fdin,fdout,fderror,0,0);
 			break;
 		case SEQUENCE_ET:
-			execute(e->gauche,0,fdin,fdout,fderror,0);
-			execute(e->droite,1,fdin,fdout,fderror,0);
+			execute(e->gauche,0,fdin,fdout,fderror,0,1);
+			execute(e->droite,1,fdin,fdout,fderror,0,0);
 			break;
 		case SEQUENCE_OU:
-			execute(e->gauche,0,fdin,fdout,fderror,0);
-			execute(e->droite,1,fdin,fdout,fderror,0);
+			execute(e->gauche,0,fdin,fdout,fderror,0,0);
+			execute(e->droite,1,fdin,fdout,fderror,0,0);
 			break;
 		case BG:
-			execute(e->gauche,0,fdin,fdout,fderror,0);
+			execute(e->gauche,0,fdin,fdout,fderror,0,0);
 			break;
 		case PIPE:
 			if(pipe(pp) < 0){
@@ -358,37 +383,37 @@ int execute(Expression *e , int wait, int fdin,int fdout,int fderror, int lastfl
 				exit(1);
 			}
 			ch_lastfd(pp[1]);
-			execute(e->gauche,0,fdin,pp[1],fderror,0);
+			execute(e->gauche,0,fdin,pp[1],fderror,0,1);
 			if(lastflag == 1){
-				execute(e->droite,1,pp[0],fdout,fderror,0);
+				execute(e->droite,1,pp[0],fdout,fderror,0,0);
 			}else{
-				execute(e->droite,0,pp[0],fdout,fderror,0);
+				execute(e->droite,0,pp[0],fdout,fderror,0,1);
 			}
 			break;
 		case REDIRECTION_I:
 			fd = open(e->arguments[0],O_RDONLY, 0666);
 			ch_lastfd(fd);
-			execute(e->gauche,1,fd,fdout,fderror,0);
+			execute(e->gauche,1,fd,fdout,fderror,0,0);
 			break;
 		case REDIRECTION_O:
 			fd = open(e->arguments[0],O_CREAT | O_RDWR, 0666);
 			ch_lastfd(fd);
-			execute(e->gauche,1,fdin,fd,fderror,0);
+			execute(e->gauche,1,fdin,fd,fderror,0,0);
 			break;
 		case REDIRECTION_A:
 			fd = open(e->arguments[0], O_TRUNC | O_CREAT | O_RDWR, 0666);
 			ch_lastfd(fd);
-			execute(e->gauche,1,fdin,fd,fderror,0);
+			execute(e->gauche,1,fdin,fd,fderror,0,0);
 			break;
 		case REDIRECTION_E:
 			fd = open(e->arguments[0], O_CREAT | O_RDWR, 0666);
 			ch_lastfd(fd);
-			execute(e->gauche,1,fdin,fdout,fd,0);
+			execute(e->gauche,1,fdin,fdout,fd,0,0);
 			break;
 		case REDIRECTION_EO:
 			fd = open(e->arguments[0], O_CREAT | O_RDWR, 0666);
 			ch_lastfd(fd);
-			execute(e->gauche,1,fdin,fd,fd,0);
+			execute(e->gauche,1,fdin,fd,fd,0,0);
 			break;
 		case VIDE:
 			putchar('\n');
@@ -397,6 +422,18 @@ int execute(Expression *e , int wait, int fdin,int fdout,int fderror, int lastfl
 			break;
 
 	}
+	t_job* job2 = jobsList;
+	if (job2 == NULL) {
+		return 0;	
+	} else {
+		while (job2 != NULL) {
+			if(job2->futurewait == 1){
+				putJobForeground(job2,FALSE);
+			}
+			job2 = job2->next;
+		}
+	}
+
 	return 0;
 
 
@@ -411,144 +448,213 @@ void ch_lastfd(int max){
 }
 
 
-
-
-void append(int num)
+void waitJob(t_job* job)
 {
-	struct node *temp,*right;
-	temp= (struct node *)malloc(sizeof(struct node));
-	temp->data=num;
-	right=(struct node *)head;
-	while(right->next != NULL)
-		right=right->next;
-	right->next =temp;
-	right=temp;
-	right->next=NULL;
+	int terminationStatus;
+	while (waitpid(job->pid, &terminationStatus, WNOHANG) == 0) {
+		if (job->status == SUSPENDED)
+			return;
+	}
+	jobsList = delJob(job);
 }
 
 
 
-void add( int num )
+
+
+void killJob(int jobId)
 {
-	struct node *temp;
-	temp=(struct node *)malloc(sizeof(struct node));
-	temp->data=num;
-	if (head== NULL)
-	{
-		head=temp;
-		head->next=NULL;
-	}
-	else
-	{
-		temp->next=head;
-		head=temp;
-	}
-}
-void addafter(int num, int loc)
-{
-	int i;
-	struct node *temp,*left,*right;
-	right=head;
-	for(i=1;i<loc;i++)
-	{
-		left=right;
-		right=right->next;
-	}
-	temp=(struct node *)malloc(sizeof(struct node));
-	temp->data=num;
-	left->next=temp;
-	left=temp;
-	left->next=right;
-	return;
+	t_job *job = getJob(jobId, BY_JOB_ID);
+	kill(job->pid, SIGKILL);
 }
 
-
-
-void insert(int num)
+t_job* insertJob(pid_t pid,char* name,int status,int futurewait)
 {
-	int c=0;
-	struct node *temp;
-	temp=head;
-	if(temp==NULL)
-	{
-		add(num);
-	}
-	else
-	{
-		while(temp!=NULL)
-		{
-			if(temp->data<num)
-				c++;
-			temp=temp->next;
+	t_job *newJob = malloc(sizeof(t_job));
+
+	newJob->name = (char*) malloc(sizeof(name));
+	newJob->name = strcpy(newJob->name, name);
+	newJob->pid = pid;
+	newJob->status = status;
+	newJob->futurewait = futurewait;
+	newJob->next = NULL;
+
+	if (jobsList == NULL) {
+		numActiveJobs++;
+		newJob->id = numActiveJobs;
+		return newJob;
+	} else {
+		t_job *auxNode = jobsList;
+		while (auxNode->next != NULL) {
+			auxNode = auxNode->next;
 		}
-		if(c==0)
-			add(num);
-		else if(c<count())
-			addafter(num,++c);
-		else
-			append(num);
+		newJob->id = auxNode->id + 1;
+		auxNode->next = newJob;
+		numActiveJobs++;
+		return jobsList;
 	}
+}
+
+t_job* getJob(int searchValue, int searchParameter)
+{
+	t_job* job = jobsList;
+	switch (searchParameter) {
+		case BY_PROCESS_ID:
+			while (job != NULL) {
+				if (job->pid == searchValue)
+					return job;
+				else
+					job = job->next;
+			}
+			break;
+		case BY_JOB_ID:
+			while (job != NULL) {
+				if (job->id == searchValue)
+					return job;
+				else
+					job = job->next;
+			}
+			break;
+		case BY_JOB_STATUS:
+			while (job != NULL) {
+				if (job->status == searchValue)
+					return job;
+				else
+					job = job->next;
+			}
+			break;
+		default:
+			return NULL;
+			break;
+	}
+	return NULL;
+}
+
+void putJobForeground(t_job* job, int continueJob)
+{
+	job->status = FOREGROUND;
+	if (continueJob) {
+		if (kill(job->pid, SIGCONT) < 0)
+			perror("kill (SIGCONT)");
+	}
+	waitJob(job);
+}
+
+
+void putJobBackground(t_job* job, int continueJob)
+{
+	if (job == NULL)
+		return;
+
+	if (continueJob && job->status != WAITING_INPUT)
+		job->status = WAITING_INPUT;
+	if (continueJob)
+		if (kill(job->pid, SIGCONT) < 0)
+			perror("kill (SIGCONT)");
+
+}
+
+t_job* delJob(t_job* job)
+{
+	if (jobsList == NULL)
+		return NULL;
+	t_job* currentJob;
+	t_job* beforeCurrentJob;
+
+	currentJob = jobsList->next;
+	beforeCurrentJob = jobsList;
+
+	if (beforeCurrentJob->pid == job->pid) {
+
+		beforeCurrentJob = beforeCurrentJob->next;
+		numActiveJobs--;
+		return currentJob;
+	}
+
+	while (currentJob != NULL) {
+		if (currentJob->pid == job->pid) {
+			numActiveJobs--;
+			beforeCurrentJob->next = currentJob->next;
+		}
+		beforeCurrentJob = currentJob;
+		currentJob = currentJob->next;
+	}
+	return jobsList;
 }
 
 
 
-int delete(int num)
+void printJobs()
 {
-	struct node *temp, *prev;
-	temp=head;
-	while(temp!=NULL)
-	{
-		if(temp->data==num)
-		{
-			if(temp==head)
-			{
-				head=temp->next;
-				free(temp);
-				return 1;
-			}
-			else
-			{
-				prev->next=temp->next;
-				free(temp);
-				return 1;
-			}
+	printf("\nActive jobs:\n");
+	printf(
+			"---------------------------------------------------------------------------\n");
+	printf("| %7s  | %30s | %5s | %6s |\n", "job no.", "name", "pid", "status");
+	printf(
+			"---------------------------------------------------------------------------\n");
+	t_job* job = jobsList;
+	if (job == NULL) {
+		printf("| %s %62s |\n", "No Jobs.", "");
+	} else {
+		while (job != NULL) {
+			printf("|  %7d | %30s | %5d | %6c |\n", job->id, job->name,
+					job->pid, job->status);
+			job = job->next;
 		}
-		else
-		{
-			prev=temp;
-			temp= temp->next;
+	}
+	printf(
+			"---------------------------------------------------------------------------\n");
+}
+
+
+
+
+
+
+
+
+int builtincommands(Expression *e){
+	if(strcmp(e->arguments[0],"cd") ==0){
+		chdir(e->arguments[1]);
+		getcwd(cwd, sizeof(cwd));
+		return 1;
+	}
+	if (strcmp(e->arguments[0],"jobs") ==0){
+		printJobs();
+		return 1;
+	}
+	if(strcmp(e->arguments[0],"exit") ==0){
+		exit(EXIT_SUCCESS);
+	}
+	if(strcmp(e->arguments[0],"fg") ==0){
+		if(e->arguments[1]== NULL){
+			return 1;
+		}
+		int jobid = (int) atoi(e->arguments[1]);
+		t_job* job = getJob(jobid, BY_JOB_ID);
+		if(job == NULL){
+			return 1;
+		}
+		if(job->status == SUSPENDED || job->status == WAITING_INPUT){
+			putJobForeground(job,TRUE);
+		}else{
+			putJobForeground(job,FALSE);
+		}
+		return 1;
+	}
+	if(strcmp(e->arguments[0],"kill") ==0){
+		if(e->arguments[1] == NULL){
+			return 1;
+		}else{
+			killJob(atoi(e->arguments[1]));
+			return 1;
 		}
 	}
 	return 0;
-}
 
 
-void  display()
-{
-	int i = 1;
-	jobs=head;
-	int status;
-	char *stat;
-	if(jobs==NULL)
-	{
-		return;
-	}
-	while(jobs!=NULL)
-	{
 
-		waitpid(jobs->data, &status, WNOHANG);
-		if(WIFSTOPPED(status)) {
-			stat = "stopped";
 
-		}else{
-			stat = "running";
-		}
-
-		printf("[%d]---(%s)---PID %d \n",i,stat,jobs->data);
-		i++;
-		jobs=jobs->next;
-	}
-	printf("\n");
 }
 
 
@@ -556,15 +662,174 @@ void  display()
 
 
 
-int count()
-{
-	struct node *n;
-	int c=0;
-	n=head;
-	while(n!=NULL)
-	{
-		n=n->next;
-		c++;
-	}
-	return c;
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*void append(int num)*/
+/*{*/
+/*struct node *temp,*right;*/
+/*temp= (struct node *)malloc(sizeof(struct node));*/
+/*temp->data=num;*/
+/*right=(struct node *)head;*/
+/*while(right->next != NULL)*/
+/*right=right->next;*/
+/*right->next =temp;*/
+/*right=temp;*/
+/*right->next=NULL;*/
+/*}*/
+
+
+
+/*void add( int num )*/
+/*{*/
+/*struct node *temp;*/
+/*temp=(struct node *)malloc(sizeof(struct node));*/
+/*temp->data=num;*/
+/*if (head== NULL)*/
+/*{*/
+/*head=temp;*/
+/*head->next=NULL;*/
+/*}*/
+/*else*/
+/*{*/
+/*temp->next=head;*/
+/*head=temp;*/
+/*}*/
+/*}*/
+/*void addafter(int num, int loc)*/
+/*{*/
+/*int i;*/
+/*struct node *temp,*left,*right;*/
+/*right=head;*/
+/*for(i=1;i<loc;i++)*/
+/*{*/
+/*left=right;*/
+/*right=right->next;*/
+/*}*/
+/*temp=(struct node *)malloc(sizeof(struct node));*/
+/*temp->data=num;*/
+/*left->next=temp;*/
+/*left=temp;*/
+/*left->next=right;*/
+/*return;*/
+/*}*/
+
+
+
+/*void insert(int num)*/
+/*{*/
+/*int c=0;*/
+/*struct node *temp;*/
+/*temp=head;*/
+/*if(temp==NULL)*/
+/*{*/
+/*add(num);*/
+/*}*/
+/*else*/
+/*{*/
+/*while(temp!=NULL)*/
+/*{*/
+/*if(temp->data<num)*/
+/*c++;*/
+/*temp=temp->next;*/
+/*}*/
+/*if(c==0)*/
+/*add(num);*/
+/*else if(c<count())*/
+/*addafter(num,++c);*/
+/*else*/
+/*append(num);*/
+/*}*/
+/*}*/
+
+
+
+/*int delete(int num)*/
+/*{*/
+/*struct node *temp, *prev;*/
+/*temp=head;*/
+/*while(temp!=NULL)*/
+/*{*/
+/*if(temp->data==num)*/
+/*{*/
+/*if(temp==head)*/
+/*{*/
+/*head=temp->next;*/
+/*free(temp);*/
+/*return 1;*/
+/*}*/
+/*else*/
+/*{*/
+/*prev->next=temp->next;*/
+/*free(temp);*/
+/*return 1;*/
+/*}*/
+/*}*/
+/*else*/
+/*{*/
+/*prev=temp;*/
+/*temp= temp->next;*/
+/*}*/
+/*}*/
+/*return 0;*/
+/*}*/
+
+
+/*void  display()*/
+/*{*/
+/*int i = 1;*/
+/*jobs=head;*/
+/*int status;*/
+/*char *stat;*/
+/*if(jobs==NULL)*/
+/*{*/
+/*return;*/
+/*}*/
+/*while(jobs!=NULL)*/
+/*{*/
+
+/*waitpid(jobs->data, &status, WNOHANG);*/
+/*if(WIFSTOPPED(status)) {*/
+/*stat = "stopped";*/
+
+/*}else{*/
+/*stat = "running";*/
+/*}*/
+
+/*printf("[%d]---(%s)---PID %d \n",i,stat,jobs->data);*/
+/*i++;*/
+/*jobs=jobs->next;*/
+/*}*/
+/*printf("\n");*/
+/*}*/
+
+
+
+
+
+
+/*int count()*/
+/*{*/
+/*struct node *n;*/
+/*int c=0;*/
+/*n=head;*/
+/*while(n!=NULL)*/
+/*{*/
+/*n=n->next;*/
+/*c++;*/
+/*}*/
+/*return c;*/
+/*}*/
+
+
+
