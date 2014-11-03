@@ -290,65 +290,66 @@ int execute(Expression *e , int wait, int fdin,int fdout,int fderror, int lastfl
 
     switch (e->type) {
         case SIMPLE:
-            if(builtincommands(e) == 1){
-                break;
-            }else{
 
-                childPID = fork();
-                if(childPID >= 0) //fork was successful
+            childPID = fork();
+            if(childPID >= 0) //fork was successful
+            {
+                if(childPID == 0) //child process
                 {
-                    if(childPID == 0) //child process
-                    {
-                        if(fdin != 0){
-                            dup2(fdin,0);
-                            close(fdin);
-                        }
-                        if(fdout != 1){
-                            dup2(fdout,1);
-                            close(fdout);
-                        }
-                        if(fderror != 2){
-                            dup2(fderror,2);
-                            close(fderror);
-                        }
-                        for(int i = 3; i <= lastfd; i++){
-                            close(i);
-                        }
+                    if(fdin != 0){
+                        dup2(fdin,0);
+                        close(fdin);
+                    }
+                    if(fdout != 1){
+                        dup2(fdout,1);
+                        close(fdout);
+                    }
+                    if(fderror != 2){
+                        dup2(fderror,2);
+                        close(fderror);
+                    }
+                    for(int i = 3; i <= lastfd; i++){
+                        close(i);
+                    }
+                    if(builtincommands(e) == 1){
+                        exit(0);
+                    }else{
 
                         execvp(e->arguments[0], &e->arguments[0]);
                         perror(e->arguments[0]);
                         exit(1);
                     }
-                    else//parent process
-                    {
-                        if(wait == 1){
-                            mode = FOREGROUND;
-                        }else{
-                            mode = BACKGROUND;
-                        }
-
-                        jobsList = insertJob(childPID,e->arguments[0],(int) mode,futurewait);
-                        job = getJob(childPID, BY_PROCESS_ID);
-
-                        if(wait == 1){
-                            for(int i = 3; i <= lastfd; i++){
-                                close(i);
-                            }
-                            putJobForeground(job, FALSE);
-
-                        }else{
-                            putJobBackground(job, FALSE);
-                        }
-                        putchar('\n');
-                        break;
-                    }
                 }
-                else// fork failed 
+                else//parent process
                 {
-                    perror("fork");
+                    if(wait == 1){
+                        mode = FOREGROUND;
+                    }else{
+                        mode = BACKGROUND;
+                    }
+
+                    jobsList = insertJob(childPID,e->arguments[0],(int) mode,futurewait);
+                    job = getJob(childPID, BY_PROCESS_ID);
+
+                    if(wait == 1){
+                        for(int i = 3; i <= lastfd; i++){
+                            close(i);
+                        }
+                        putJobForeground(job, FALSE);
+
+                    }else{
+                        putJobBackground(job, FALSE);
+                    }
+                    putchar('\n');
+                    break;
                 }
-                break;
             }
+            else// fork failed 
+            {
+                perror("fork");
+            }
+            break;
+
         case SEQUENCE:
             execute(e->gauche,1,fdin,fdout,fderror,0,0);
             execute(e->droite,1,fdin,fdout,fderror,0,0);
