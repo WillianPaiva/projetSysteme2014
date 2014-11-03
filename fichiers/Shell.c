@@ -37,8 +37,6 @@
 
 
 int lastfd;
-char cwd[1024];
-char user;
 
 
 
@@ -197,18 +195,8 @@ int main (int argc, char **argv)
 
 
 
-	getcwd(cwd, sizeof(cwd));
-	if(getuid()==0){
-		user = '#';
-	}else{
-		user = '$';
-	}
 
-
-	printf(ANSI_COLOR_GREEN "%s " ANSI_COLOR_BLUE " %c" ANSI_COLOR_RED ">>>"ANSI_COLOR_RESET " ",cwd,user);
-
-
-
+	
 	while (1){
 		if (yyparse () == 0) {
 			/*--------------------------------------------------------------------------------------.
@@ -267,9 +255,7 @@ int main (int argc, char **argv)
 					job2 = job2->next;
 				}
 			}
-			printf(ANSI_COLOR_GREEN "%s " ANSI_COLOR_BLUE " %c" ANSI_COLOR_RED ">>>"ANSI_COLOR_RESET " ",cwd,user);
-
-
+		
 
 		}
 		else {
@@ -596,7 +582,6 @@ void printJobs()
 int builtincommands(Expression *e){
 	if(strcmp(e->arguments[0],"cd") ==0){
 		chdir(e->arguments[1]);
-		getcwd(cwd, sizeof(cwd));
 		return 1;
 	}
 	if (strcmp(e->arguments[0],"jobs") ==0){

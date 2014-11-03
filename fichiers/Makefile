@@ -1,6 +1,6 @@
 LEX 	= lex
 YACC 	= yacc -d -v
-CC	= gcc -std=c99 -g -D_POSIX_SOURCE -Wall
+CC	= gcc -std=c99 -g -D_POSIX_SOURCE -Wall -lreadline
 LIBS	= -lfl
 
 Shell: Shell.o y.tab.o lex.yy.o
