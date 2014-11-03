@@ -198,7 +198,7 @@ int main (int argc, char **argv)
     sb.sa_handler = job_stop;
     sigaction(SIGTSTP, &sb, NULL);
 
-    
+
     signal(SIGQUIT, SIG_IGN);
     signal(SIGTTOU, SIG_IGN);
     signal(SIGTTIN, SIG_IGN);
@@ -628,6 +628,18 @@ int builtincommands(Expression *e)
         printf("%s\n","TODO");
         return 1;
     }
+    if(strcmp(e->arguments[0],"history") ==0){
+        HIST_ENTRY **the_history_list =  history_list ();
+        for(int i = 0;;i++){
+            if(the_history_list[i] != NULL){
+                printf("[%d]-------->   %s\n",i,the_history_list[i]->line);
+            }else{
+                break;
+            }
+        }
+        return 1;
+    }
+
 
     return 0;
 

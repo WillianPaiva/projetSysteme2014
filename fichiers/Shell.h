@@ -69,7 +69,6 @@ static int numActiveJobs = 0;
 
 
 
-
 static char *get_pwd(char *str)
 {
   static char buffer[4096];
