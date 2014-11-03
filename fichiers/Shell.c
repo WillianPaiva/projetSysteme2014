@@ -56,8 +56,8 @@ Expression *ConstruireNoeud (expr_t type, Expression *g, Expression *d, char **a
     return e;
 } /* ConstruireNoeud */
 
-
-void sigchild_handler(int sig){
+void sigchild_handler(int sig)
+{
     pid_t pid;
     int terminationStatus;
     pid = waitpid(-1, &terminationStatus, WUNTRACED | WNOHANG);
@@ -93,9 +93,6 @@ void sigchild_handler(int sig){
 
 }
 
-
-
-
 /*
  * Renvoie la longueur d'une liste d'arguments
  */
@@ -106,8 +103,6 @@ int LongueurListe(char **l)
         ;
     return p-l;
 } /* LongueurListe */
-
-
 
 /*
  * Renvoie une liste d'arguments, la première case étant initialisée à NULL, la
@@ -123,8 +118,6 @@ char **InitialiserListeArguments (void)
     return l;
 } /* InitialiserListeArguments */
 
-
-
 /*
  * Ajoute en fin de liste le nouvel argument et renvoie la liste résultante
  */
@@ -138,8 +131,6 @@ char **AjouterArg (char **Liste, char *Arg)
     *l = NULL;
     return Liste;
 } /* AjouterArg */
-
-
 
 /*
  * Fonction appelée lorsque l'utilisateur tape "".
@@ -177,43 +168,41 @@ expression_free(Expression *e)
     free(e);
 }
 
-void job_stop(int sig){
-    if (kill(actualJob, SIGTSTP) < 0){
+void job_stop(int sig)
+{
+    if (kill(actualJob, SIGTSTP) < 0)
+    {
         perror("kill (SIGTSTP)");
-    }else{
-        putJobBackground(getJob(actualJob,BY_PROCESS_ID),FALSE);
-        printf("send job ----> %d background",actualJob);
     }
-
-
 }
-void job_kill(int sig){
+
+void job_kill(int sig)
+{
     if (kill(actualJob, SIGINT) < 0){
         perror("kill (SIGINT)");
     }		
 }
 
-
-
-
-
-
 int main (int argc, char **argv) 
 {  
-
+    chdir(getenv("HOME"));
     struct sigaction sa;
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = 0;
     sa.sa_handler = sigchild_handler;
     sigaction(SIGCHLD, &sa, NULL);
+
+    struct sigaction sb;
+    sigemptyset(&sb.sa_mask);
+    sb.sa_flags = 0;
+    sb.sa_handler = job_stop;
+    sigaction(SIGTSTP, &sb, NULL);
+
     
     signal(SIGQUIT, SIG_IGN);
     signal(SIGTTOU, SIG_IGN);
     signal(SIGTTIN, SIG_IGN);
-    signal(SIGTSTP, &job_stop);
     signal(SIGINT,	&job_kill);
-
-
 
 
 
@@ -289,8 +278,8 @@ int main (int argc, char **argv)
     return 0;
 }
 
-
-int execute(Expression *e , int wait, int fdin,int fdout,int fderror, int lastflag, int futurewait){
+int execute(Expression *e , int wait, int fdin,int fdout,int fderror, int lastflag, int futurewait)
+{
     pid_t childPID;
     int fd;
     int pp[2];
@@ -427,14 +416,12 @@ int execute(Expression *e , int wait, int fdin,int fdout,int fderror, int lastfl
 
 }
 
-
-
-void ch_lastfd(int max){
+void ch_lastfd(int max)
+{
     if(lastfd < max){
         lastfd = max;
     }
 }
-
 
 void waitJob(t_job* job)
 { 
@@ -449,10 +436,6 @@ void waitJob(t_job* job)
     actualJob = 0;
 
 }
-
-
-
-
 
 void killJob(int jobId)
 {
@@ -532,7 +515,6 @@ void putJobForeground(t_job* job, int continueJob)
     waitJob(job);
 }
 
-
 void putJobBackground(t_job* job, int continueJob)
 {
     if(job->status == FOREGROUND){
@@ -579,8 +561,6 @@ t_job* delJob(t_job* job)
     return jobsList;
 }
 
-
-
 void printJobs()
 {
     printf("\nActive jobs:\n");
@@ -603,16 +583,14 @@ void printJobs()
             "--------------------------------------------------------------\n");
 }
 
-
-
-
-
-
-
-
-int builtincommands(Expression *e){
+int builtincommands(Expression *e)
+{
     if(strcmp(e->arguments[0],"cd") ==0){
-        chdir(e->arguments[1]);
+        if(e->arguments[1] != NULL){
+            chdir(e->arguments[1]);
+        }else{
+            chdir(getenv("HOME"));
+        }
         return 1;
     }
     if (strcmp(e->arguments[0],"jobs") ==0){
@@ -646,13 +624,17 @@ int builtincommands(Expression *e){
             return 1;
         }
     }
+    if(strcmp(e->arguments[0],"dirs") ==0){
+        printf("%s\n","TODO");
+        return 1;
+    }
+
     return 0;
 
 
 
 
 }
-
 
 int changeJobStatus(int pid, int status)
 {
