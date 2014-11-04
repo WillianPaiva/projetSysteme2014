@@ -271,7 +271,7 @@ int main (int argc, char **argv)
                 }
             }
 
-
+            expression_free(e);
         }
         else {
             /* L'analyse de la ligne de commande a donné une erreur */
@@ -724,53 +724,6 @@ int changeJobStatus(int pid, int status)
         return FALSE;
     }
 }
-
-/*void popStack()*/
-/*{*/
-/*struct Node *temp, *var=top;*/
-/*if(var==top)*/
-/*{*/
-/*top = top->next;*/
-/*free(var);*/
-/*}*/
-/*else*/
-/*printf("\nStack Empty");*/
-/*}*/
-
-/*void push(char * value)*/
-/*{*/
-/*struct Node *temp;*/
-/*temp=(struct Node *)malloc(sizeof(struct Node));*/
-/*temp->Data = malloc(sizeof(value));*/
-/*strcpy(temp->Data,value);*/
-/*if (top == NULL)*/
-/*{*/
-/*top=temp;*/
-/*top->next=NULL;*/
-/*}*/
-/*else*/
-/*{*/
-/*temp->next=top;*/
-/*top=temp;*/
-/*}*/
-/*}*/
-
-/*void display()*/
-/*{*/
-/*struct Node *var=top;*/
-/*if(var!=NULL)*/
-/*{ */
-/*printf("\nElements are as:\n");*/
-/*while(var!=NULL)*/
-/*{*/
-/*printf("%s\n",var->Data);*/
-/*var=var->next;*/
-/*} */
-/*printf("\n");*/
-/*}*/
-/*else*/
-/*printf("\nStack is Empty");*/
-/*}*/
 
 Node *Node_create() {
     Node *node = malloc(sizeof(Node));
