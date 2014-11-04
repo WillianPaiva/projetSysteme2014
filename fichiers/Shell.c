@@ -42,6 +42,8 @@
 int lastfd;
 pid_t actualJob;
 List *DirStack;
+char** env;
+
 Expression *ConstruireNoeud (expr_t type, Expression *g, Expression *d, char **args)
 {
     Expression *e;
@@ -187,9 +189,9 @@ void job_kill(int sig)
     }
 }
 
-int main (int argc, char **argv) 
+int main (int argc, char **argv, char** envp) 
 { 
-
+    env = envp;
     DirStack = List_create();
     chdir(getenv("HOME"));
     struct sigaction sa;
@@ -723,6 +725,16 @@ int builtincommands(Expression *e)
         }
         return 1;
     }
+    if(strcmp(e->arguments[0],"printenv") ==0){
+        char **en;
+        for (en = env; *en != 0; en++)
+        {
+            char* thisEnv = *en;
+            printf("%s\n", thisEnv);    
+        }
+        return 1;
+    }
+
     return 0;
 
 }
