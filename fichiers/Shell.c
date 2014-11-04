@@ -189,6 +189,13 @@ void job_kill(int sig)
     }
 }
 
+void quit(int sig)
+{
+    exit(0);
+}
+
+
+
 int main (int argc, char **argv, char** envp) 
 { 
     env = envp;
@@ -215,7 +222,7 @@ int main (int argc, char **argv, char** envp)
     struct sigaction se;
     sigemptyset(&se.sa_mask);
     se.sa_flags = 0;
-    se.sa_handler = SIG_IGN;
+    se.sa_handler = quit;
     sigaction(SIGQUIT, &se, NULL);
 
     struct sigaction sf;
