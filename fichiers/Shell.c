@@ -12,6 +12,9 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include "Shell.h"
+#include <sys/stat.h>
+#include <errno.h>
+#include <assert.h>
 
 #define ANSI_COLOR_RED     "\x1b[31m"
 #define ANSI_COLOR_GREEN   "\x1b[32m"
@@ -37,9 +40,8 @@
 
 
 int lastfd;
-
 pid_t actualJob;
-
+List *DirStack;
 Expression *ConstruireNoeud (expr_t type, Expression *g, Expression *d, char **args)
 {
     Expression *e;
@@ -184,7 +186,9 @@ void job_kill(int sig)
 }
 
 int main (int argc, char **argv) 
-{  
+{ 
+
+    DirStack = List_create();
     chdir(getenv("HOME"));
     struct sigaction sa;
     sigemptyset(&sa.sa_mask);
@@ -290,65 +294,66 @@ int execute(Expression *e , int wait, int fdin,int fdout,int fderror, int lastfl
 
     switch (e->type) {
         case SIMPLE:
+            if(builtincommands(e) == 1){
+                break;    
+            }else{
 
-            childPID = fork();
-            if(childPID >= 0) //fork was successful
-            {
-                if(childPID == 0) //child process
+                childPID = fork();
+                if(childPID >= 0) //fork was successful
                 {
-                    if(fdin != 0){
-                        dup2(fdin,0);
-                        close(fdin);
-                    }
-                    if(fdout != 1){
-                        dup2(fdout,1);
-                        close(fdout);
-                    }
-                    if(fderror != 2){
-                        dup2(fderror,2);
-                        close(fderror);
-                    }
-                    for(int i = 3; i <= lastfd; i++){
-                        close(i);
-                    }
-                    if(builtincommands(e) == 1){
-                        exit(0);
-                    }else{
+                    if(childPID == 0) //child process
+                    {
+                        if(fdin != 0){
+                            dup2(fdin,0);
+                            close(fdin);
+                        }
+                        if(fdout != 1){
+                            dup2(fdout,1);
+                            close(fdout);
+                        }
+                        if(fderror != 2){
+                            dup2(fderror,2);
+                            close(fderror);
+                        }
+                        for(int i = 3; i <= lastfd; i++){
+                            close(i);
+                        }
 
                         execvp(e->arguments[0], &e->arguments[0]);
                         perror(e->arguments[0]);
                         exit(1);
-                    }
-                }
-                else//parent process
-                {
-                    if(wait == 1){
-                        mode = FOREGROUND;
-                    }else{
-                        mode = BACKGROUND;
-                    }
 
-                    jobsList = insertJob(childPID,e->arguments[0],(int) mode,futurewait);
-                    job = getJob(childPID, BY_PROCESS_ID);
-
-                    if(wait == 1){
-                        for(int i = 3; i <= lastfd; i++){
-                            close(i);
+                    }
+                    else//parent process
+                    {
+                        if(wait == 1){
+                            mode = FOREGROUND;
+                        }else{
+                            mode = BACKGROUND;
                         }
-                        putJobForeground(job, FALSE);
 
-                    }else{
-                        putJobBackground(job, FALSE);
+                        jobsList = insertJob(childPID,e->arguments[0],(int) mode,futurewait);
+                        job = getJob(childPID, BY_PROCESS_ID);
+
+                        if(wait == 1){
+                            for(int i = 3; i <= lastfd; i++){
+                                close(i);
+                            }
+                            putJobForeground(job, FALSE);
+
+                        }else{
+                            putJobBackground(job, FALSE);
+                        }
+                        putchar('\n');
+                        break;
                     }
-                    putchar('\n');
-                    break;
                 }
-            }
-            else// fork failed 
-            {
-                perror("fork");
-            }
-            break;
+                else// fork failed 
+                {
+                    perror("fork");
+                }
+                break;
+            }            
 
         case SEQUENCE:
             execute(e->gauche,1,fdin,fdout,fderror,0,0);
@@ -626,7 +631,16 @@ int builtincommands(Expression *e)
         }
     }
     if(strcmp(e->arguments[0],"dirs") ==0){
-        printf("%s\n","TODO");
+        if(List_length(DirStack) >0){
+            List_print(DirStack);
+            return 1;
+        }else{
+            char p[1024];
+            getcwd(p, sizeof(p));
+            char *p2 = get_pwd(p);
+            printf("%s\n",p2 );
+            return 1;
+        }
         return 1;
     }
     if(strcmp(e->arguments[0],"history") ==0){
@@ -640,12 +654,55 @@ int builtincommands(Expression *e)
         }
         return 1;
     }
+    if(strcmp(e->arguments[0 ],"pushd") ==0){
+        if(e->arguments[1] != NULL){
+            char * checker = NULL;
+            char path[1024] = "";
+            char path2[1024] = "";
+            checker = strstr(e->arguments[1], "/");
+            if(checker == e->arguments[1])
+            {
+                strcat(path,e->arguments[1]);
+            }else{
+                getcwd(path, sizeof(path));
+                strcat(path,"/");//you found the match
+                strcat(path,e->arguments[1]);
+            }
+            struct stat s;
+            if( stat(path,&s) == 0 )
+            {
+                if( s.st_mode & __S_IFDIR )
+                {
+                    getcwd(path2,sizeof(path2));
+                    printf("%s\n",path );
+                    chdir(path);
+                    List_append(DirStack,path2);
+                    return 1;
+                }
+                else if( s.st_mode & __S_IFREG )
+                {
+                    printf("%s   that is a file \n",path);//it's a file
+                    return 1;
+                }
+            }
+            else
+            {
+                perror("pushd");
+            }
 
-
+        }
+        return 1;
+    }
+    if(strcmp(e->arguments[0],"popd") ==0){
+        if(DirStack != NULL){ 
+            printf("%s\n",List_get(DirStack,List_length(DirStack) -1));
+            chdir(List_get(DirStack,List_length(DirStack) -1));
+            List_pop(DirStack,List_length(DirStack) -1);
+            return 1;
+        }
+        return 1;
+    }
     return 0;
-
-
-
 
 }
 
@@ -668,12 +725,243 @@ int changeJobStatus(int pid, int status)
     }
 }
 
+/*void popStack()*/
+/*{*/
+/*struct Node *temp, *var=top;*/
+/*if(var==top)*/
+/*{*/
+/*top = top->next;*/
+/*free(var);*/
+/*}*/
+/*else*/
+/*printf("\nStack Empty");*/
+/*}*/
+
+/*void push(char * value)*/
+/*{*/
+/*struct Node *temp;*/
+/*temp=(struct Node *)malloc(sizeof(struct Node));*/
+/*temp->Data = malloc(sizeof(value));*/
+/*strcpy(temp->Data,value);*/
+/*if (top == NULL)*/
+/*{*/
+/*top=temp;*/
+/*top->next=NULL;*/
+/*}*/
+/*else*/
+/*{*/
+/*temp->next=top;*/
+/*top=temp;*/
+/*}*/
+/*}*/
+
+/*void display()*/
+/*{*/
+/*struct Node *var=top;*/
+/*if(var!=NULL)*/
+/*{ */
+/*printf("\nElements are as:\n");*/
+/*while(var!=NULL)*/
+/*{*/
+/*printf("%s\n",var->Data);*/
+/*var=var->next;*/
+/*} */
+/*printf("\n");*/
+/*}*/
+/*else*/
+/*printf("\nStack is Empty");*/
+/*}*/
+
+Node *Node_create() {
+    Node *node = malloc(sizeof(Node));
+    assert(node != NULL);
+
+    node->data = "";
+    node->next = NULL;
+
+    return node;
+}
 
 
+void Node_destroy(Node *node) {
+    assert(node != NULL);
+    free(node->data);
+    free(node);
+}
 
 
+List *List_create() {
+    List *list = malloc(sizeof(List));
+
+    Node *node = Node_create();
+    list->first = node;
+
+    return list;
+}
 
 
+void List_destroy(List *list) {
+
+    Node *node = list->first;
+    Node *next;
+    while (node != NULL) {
+        next = node->next;
+        free(node->data);
+        free(node);
+        node = next;
+    }
+
+    free(list);
+}
+
+
+void List_append(List *list, char *str) {
+
+    Node *node = list->first;
+    while (node->next != NULL) {
+        node = node->next;
+    }
+    node->data = malloc(sizeof(char) * 1024);
+    strcpy(node->data,str);
+    node->next = Node_create();
+}
+
+
+void List_insert(List *list, int index, char *str) {
+    assert(list != NULL);
+    assert(str !=NULL);
+    assert(0 <= index);
+    assert(index <= List_length(list));
+
+    if (index == 0) {
+        Node *after = list->first;
+        list->first = Node_create();
+        list->first->data = str;
+        list->first->next = after;
+    } else if (index == List_length(list)) {
+        List_append(list, str);
+    } else {
+        Node *before = list->first;
+        Node *after = list->first->next;
+        while (index > 1) {
+            index--;
+            before = before->next;
+            after = after->next;
+        }
+        before->next = Node_create();
+        before->next->data = str;
+        before->next->next = after;
+    }
+}
+
+
+char *List_get(List *list, int index) {
+    if(list != NULL && 0 <=index && index < List_length(list)){
+        Node *node = list->first;
+        while (index > 0) {
+            node = node->next;
+            index--;
+        }
+        return node->data;
+    }
+    return "";
+}
+
+
+int List_find(List *list, char *str) {
+    assert(list != NULL);
+    assert(str != NULL);
+
+    int index = 0;
+    Node *node = list->first;
+    while (node->next != NULL) {
+        if (strlen(str) == strlen(node->data)) {
+            int cmp = strcmp(str, node->data);
+            if (cmp == 0) {
+                return index;
+            }
+        }
+        node = node->next;
+        index++;
+    }
+    return -1;
+}
+
+
+void List_remove(List *list, int index) {
+    assert(list != NULL);
+    assert(0 <= index);
+    assert(index < List_length(list));
+
+    if (index == 0) {
+        Node *node = list->first;
+        list->first = list->first->next;
+        Node_destroy(node);
+    } else {
+        Node *before = list->first;
+        while (index > 1) {
+            before = before->next;
+            index--;
+        }
+        Node *node = before->next;
+        before->next = before->next->next;
+        Node_destroy(node);
+    }
+}
+
+
+void List_pop(List *list, int index) {
+    if(list != NULL && 0 <=index && index < List_length(list)){
+        if (index == 0) {
+            Node *node = list->first;
+            list->first = list->first->next;
+            char *data = node->data;
+            Node_destroy(node);
+        } else {
+            Node *before = list->first;
+            while (index > 1) {
+                before = before->next;
+                index--;
+            }
+            Node *node = before->next;
+            before->next = before->next->next;
+            char *data = node->data;
+            Node_destroy(node);
+        }
+    }
+}
+
+
+int List_length(List *list) {
+    int length = 0;
+    if(list != NULL){ 
+        Node *node = list->first;
+        while (node->next != NULL) {
+            length++;
+            node = node->next;
+        }
+
+    }else{
+        length = -1;
+    }
+    return length;
+}
+
+
+void List_print(List *list) {
+    if(list != NULL){
+        Node *node = list->first;
+        while (node->next != NULL) {
+            char *p2 = get_pwd(node->data);
+            printf("%s\n", p2);
+            node = node->next;
+            if (node->next != NULL) {
+            }
+        }
+    }else{
+        printf("%s\n","empty stack" ); 
+    }
+}
 
 
 

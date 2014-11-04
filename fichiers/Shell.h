@@ -28,6 +28,9 @@
 #define NB_ARGS 50
 #define TAILLE_ID 500
 
+
+
+
 typedef enum expr_t {
   VIDE,	         		// Commande vide 
   SIMPLE,        		// Commande simple 
@@ -42,6 +45,9 @@ typedef enum expr_t {
   REDIRECTION_E, 		// Redirection sortie erreur 
   REDIRECTION_EO,		// Redirection sorties erreur et standard 
 } expr_t;
+
+
+
 
 typedef struct Expression {
   expr_t type;
@@ -202,15 +208,6 @@ void addjob(int job);
 void printjobs();
 
 
-
-
-
-
-
-
-
-
-
 int builtincommands(Expression *e);
 void printJobs();
 
@@ -234,5 +231,37 @@ int changeJobStatus(int pid, int status);
 
 void yyerror (char *s);
 Expression *ExpressionAnalysee;
+
+
+
+
+
+typedef struct NodeTag {
+    char *data;
+    struct NodeTag *next;
+} Node;
+
+Node *Node_create();
+void Node_destroy(Node *node);
+
+typedef struct ListTag {
+    struct NodeTag *first;
+} List;
+
+List *List_create();
+void List_destroy(List *list);
+
+void List_append(List *list, char *str);
+void List_insert(List *list, int index, char *str);
+
+char *List_get(List *list, int index);
+int List_find(List *list, char *str);
+
+void List_remove(List *list, int index);
+void List_pop(List *list, int index);
+
+int List_length(List *list);
+void List_print(List *list);
+
 
 #endif /* ANALYSE */
