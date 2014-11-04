@@ -180,9 +180,11 @@ void job_stop(int sig)
 
 void job_kill(int sig)
 {
-    if (kill(actualJob, SIGINT) < 0){
-        perror("kill (SIGINT)");
-    }		
+    if(actualJob != 0){
+        if (kill(actualJob, SIGINT) < 0){
+            perror("kill (SIGINT)");
+        }		
+    }
 }
 
 int main (int argc, char **argv) 
@@ -202,11 +204,30 @@ int main (int argc, char **argv)
     sb.sa_handler = job_stop;
     sigaction(SIGTSTP, &sb, NULL);
 
+    struct sigaction sc;
+    sigemptyset(&sc.sa_mask);
+    sc.sa_flags = 0;
+    sc.sa_handler = job_kill;
+    sigaction(SIGINT, &sc, NULL);
 
-    signal(SIGQUIT, SIG_IGN);
-    signal(SIGTTOU, SIG_IGN);
-    signal(SIGTTIN, SIG_IGN);
-    signal(SIGINT,	&job_kill);
+    struct sigaction se;
+    sigemptyset(&se.sa_mask);
+    se.sa_flags = 0;
+    se.sa_handler = SIG_IGN;
+    sigaction(SIGQUIT, &se, NULL);
+
+    struct sigaction sf;
+    sigemptyset(&sf.sa_mask);
+    sf.sa_flags = 0;
+    sf.sa_handler = SIG_IGN;
+    sigaction(SIGTTOU, &sf, NULL);
+
+
+    struct sigaction sg;
+    sigemptyset(&sg.sa_mask);
+    sg.sa_flags = 0;
+    sg.sa_handler = SIG_IGN;
+    sigaction(SIGTTIN, &sg, NULL);
 
 
 
