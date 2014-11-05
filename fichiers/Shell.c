@@ -72,7 +72,7 @@ void sigchild_handler(int sig)
         }
         if (WIFEXITED(terminationStatus)) {
             if (job->status == BACKGROUND) {
-                printf("\n[%d]+  Done\t   %s\n", job->id, job->name);
+                //printf("\n[%d]+  Done\t   %s\n", job->id, job->name);
                 jobsList = delJob(job);
             }
         } else if (WIFSIGNALED(terminationStatus)) {
@@ -374,7 +374,7 @@ int execute(Expression *e , int wait, int fdin,int fdout,int fderror, int lastfl
                         }else{
                             putJobBackground(job, FALSE);
                         }
-                        putchar('\n');
+                       // putchar('\n');
                         break;
                     }
                 }
